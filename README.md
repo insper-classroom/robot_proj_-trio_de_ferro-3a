@@ -6,10 +6,9 @@ ____________
 
 Nome dos integrantes: 
 
-* pessoa 1
-* pessoa 2
-* pessoa 3
-* pessoa 4
+* Carolina Hirschheimer
+* Natália Queiroz Menezes Carreras
+* Rodrigo Nigri Griner
 
 
 Visite sempre o enunciado abaixo para atualizacões: 
