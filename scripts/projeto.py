@@ -20,16 +20,15 @@ from geometry_msgs.msg import Twist, Vector3, Pose, Vector3Stamped
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 
-print("EXECUTE ANTES da 1.a vez: ")
-print("wget https://github.com/Insper/robot21.1/raw/main/projeto/ros_projeto/scripts/MobileNetSSD_deploy.caffemodel")
-print("PARA TER OS PESOS DA REDE NEURAL")
 
 import visao_module
 
+from sklearn.linear_model import LinearRegression
 
 bridge = CvBridge()
 
 cv_image = None
+theta = 0.0
 media = []
 centro = []
 atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
@@ -55,6 +54,110 @@ tfl = 0
 
 tf_buffer = tf2_ros.Buffer()
 
+def crosshair(img, point, size, color):
+    """ Desenha um crosshair centrado no point.
+        point deve ser uma tupla (x,y)
+        color é uma tupla R,G,B uint8
+    """
+    x,y = point
+    cv2.line(img,(x - size,y),(x + size,y),color,2)
+    cv2.line(img,(x,y - size),(x, y + size),color,2)
+
+
+def processa_imagem(imagem): # CHECK
+    '''
+    recebe imagem e devolve o angulo da regressao com a horizontal
+    '''
+
+    # Filtrando amarelos:
+    frame = imagem.copy()
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+    low = (25, 50, 50)
+    high = (35, 255, 255)
+    mask = cv2.inRange(hsv, low, high)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(6,6))
+    mask = cv2.erode(mask,kernel,iterations = 1)
+    #mask = cv2.morphologyEx( mask, cv2.MORPH_OPEN, kernel )
+    #mask = cv2.morphologyEx( mask, cv2.MORPH_CLOSE, kernel )
+    cv2.imshow("Linhas amarelas", mask)
+
+
+    #Thresh
+    ret, thresh = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
+
+    #Encontrando os contornos
+    contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    # encontrar centros de massa
+    lista_x = [] # coordenadas x
+    lista_y = [] # coordenadas y
+
+    for c in contornos:
+
+        M = cv2.moments(c)
+
+        try:
+            cX = int(M["m10"] / M["m00"])
+            cY = int(M["m01"] / M["m00"])
+            crosshair(frame, (cX,cY), size=5, color=(0, 255, 0))
+            lista_x.append(cX)
+            lista_y.append(cY)
+        except:
+            print("passou")
+
+
+    linear_regressor = LinearRegression()  # create object for the class
+
+    lista_x = np.array(lista_x)
+    lista_x = lista_x.reshape(-1,1)
+    lista_y = np.array(lista_y)
+    lista_y = lista_y.reshape(-1,1)
+    
+    if len(lista_x > 0) and len(lista_y > 0):
+        linear_regressor.fit(lista_x, lista_y)  # perform linear regression
+            
+        X = np.array([-1000, 1000]).reshape(-1, 1)
+        Y_pred = linear_regressor.predict(X)  # make predictions
+
+        img_regres = cv2.line(frame, (int(X[0]),int(Y_pred[0])), (int(X[1]),int(Y_pred[1])), (0, 255, 0), thickness=3, lineType=8)
+        
+        #pontos da curva
+        X1 = X[0]
+        X2 = X[-1]
+        delta_X = X2 - X1
+
+        Y1 = Y_pred[0]
+        Y2 = Y_pred[-1]
+        delta_Y = Y2 - Y1
+
+
+        angulo_in = math.degrees(math.atan2(delta_X, delta_Y))
+
+        if 180 > angulo_in > 90:
+            angulo = angulo_in - 90
+        elif angulo_in < 90:
+            angulo = angulo_in + 90
+        else:
+            angulo = angulo_in
+    print(angulo)
+    cv2.imshow("regressão", frame)
+    return angulo
+
+
+def percorrendo_pista(angulo):        
+    if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
+        frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
+        velocidade_saida.publish(frente)
+    elif angulo < 50:
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+        velocidade_saida.publish(direita)
+    elif angulo > 130:
+        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
+        velocidade_saida.publish(esquerda)
+
+    return None
 
 
 # A função a seguir é chamada sempre que chega um novo frame
@@ -64,6 +167,7 @@ def roda_todo_frame(imagem):
     global media
     global centro
     global resultados
+    global theta
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -84,9 +188,16 @@ def roda_todo_frame(imagem):
             # print(r) - print feito para documentar e entender
             # o resultado            
             pass
-
+        
+        
+        
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
+        theta = processa_imagem(cv_image)
+
+
+
+
         cv2.imshow("cv_image", cv_image)
         cv2.waitKey(1)
     except CvBridgeError as e:
@@ -107,6 +218,10 @@ if __name__=="__main__":
     tfl = tf2_ros.TransformListener(tf_buffer) #conversao do sistema de coordenadas 
     tolerancia = 25
 
+    #CRIAÇÃO DE ESTADOS:
+    ANDANDO = 0
+
+
     try:
         # Inicializando - por default gira no sentido anti-horário
         vel = Twist(Vector3(0,0,0), Vector3(0,0,math.pi/10.0))
@@ -115,10 +230,9 @@ if __name__=="__main__":
             for r in resultados:
                 print(r)
             
-            velocidade_saida.publish(vel)
+            #percorrendo_pista(theta)
+            #velocidade_saida.publish(vel)
             rospy.sleep(0.1)
 
     except rospy.ROSInterruptException:
         print("Ocorreu uma exceção com o rospy")
-
-
