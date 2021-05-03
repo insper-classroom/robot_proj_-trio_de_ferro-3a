@@ -28,6 +28,7 @@ from sklearn.linear_model import LinearRegression
 bridge = CvBridge()
 
 cv_image = None
+ponto_medio = (0,0)
 theta = 0.0
 media = []
 centro = []
@@ -118,20 +119,25 @@ def processa_imagem(imagem): # CHECK
     if len(lista_x > 0) and len(lista_y > 0):
         linear_regressor.fit(lista_x, lista_y)  # perform linear regression
             
-        X = np.array([-1000, 1000]).reshape(-1, 1)
+        X = np.array([0, frame.shape[1]]).reshape(-1, 1)
         Y_pred = linear_regressor.predict(X)  # make predictions
 
         img_regres = cv2.line(frame, (int(X[0]),int(Y_pred[0])), (int(X[1]),int(Y_pred[1])), (0, 255, 0), thickness=3, lineType=8)
         
         #pontos da curva
-        X1 = X[0]
-        X2 = X[-1]
+        X1 = X[0][0]
+        X2 = X[-1][0]
         delta_X = X2 - X1
+        
+        medio_X = (X1+X2)/2
 
-        Y1 = Y_pred[0]
-        Y2 = Y_pred[-1]
+        Y1 = Y_pred[0][0]
+        Y2 = Y_pred[-1][0]
         delta_Y = Y2 - Y1
+        medio_Y = (Y1+Y2)/2
+        ponto_medio = (medio_X, medio_Y)
 
+        crosshair(frame, (int(medio_X),int(medio_Y)), size=10, color=(255, 255, 0))
 
         angulo_in = math.degrees(math.atan2(delta_X, delta_Y))
 
@@ -143,11 +149,11 @@ def processa_imagem(imagem): # CHECK
             angulo = angulo_in
     print(angulo)
     cv2.imshow("regressão", frame)
-    return angulo
+    return angulo, ponto_medio
 
 
-def percorrendo_pista(angulo):        
-    if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
+def percorrendo_pista(angulo, imagem, ponto_medio):        
+    '''if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
         frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
     elif angulo < 50:
@@ -155,7 +161,17 @@ def percorrendo_pista(angulo):
         velocidade_saida.publish(direita)
     elif angulo > 130:
         esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
+        velocidade_saida.publish(esquerda)'''
+
+    if ponto_medio[0] > imagem.shape[1]/2+10:
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+        velocidade_saida.publish(direita)
+    elif ponto_medio[0] < imagem.shape[1]/2-10:
+        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
         velocidade_saida.publish(esquerda)
+    else:
+        frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
+        velocidade_saida.publish(frente)
 
     return None
 
@@ -168,6 +184,7 @@ def roda_todo_frame(imagem):
     global centro
     global resultados
     global theta
+    global ponto_medio
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -193,7 +210,7 @@ def roda_todo_frame(imagem):
         
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
-        theta = processa_imagem(cv_image)
+        theta, ponto_medio = processa_imagem(cv_image)
 
 
 
@@ -230,7 +247,7 @@ if __name__=="__main__":
             for r in resultados:
                 print(r)
             
-            #percorrendo_pista(theta)
+            percorrendo_pista(theta, cv_image, ponto_medio)
             #velocidade_saida.publish(vel)
             rospy.sleep(0.1)
 
