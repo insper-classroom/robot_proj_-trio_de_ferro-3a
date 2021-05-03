@@ -74,6 +74,7 @@ def processa_imagem(imagem): # CHECK
     frame = imagem.copy()
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
+
     low = (25, 50, 50)
     high = (35, 255, 255)
     mask = cv2.inRange(hsv, low, high)
@@ -91,11 +92,11 @@ def processa_imagem(imagem): # CHECK
     #Encontrando os contornos
     contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-    # encontrar centros de massa
+    """# encontrar centros de massa
     lista_x = [] # coordenadas x
-    lista_y = [] # coordenadas y
+    lista_y = [] # coordenadas y"""
 
-    for c in contornos:
+    """for c in contornos:
 
         M = cv2.moments(c)
 
@@ -106,8 +107,13 @@ def processa_imagem(imagem): # CHECK
             lista_x.append(cX)
             lista_y.append(cY)
         except:
-            print("passou")
+            print("passou")"""
 
+    pontos_brancos = np.where(mask==255)
+    lista_x = pontos_brancos[1]
+    lista_y = pontos_brancos[0]
+    
+    print(lista_x)
 
     linear_regressor = LinearRegression()  # create object for the class
 
@@ -117,26 +123,28 @@ def processa_imagem(imagem): # CHECK
     lista_y = lista_y.reshape(-1,1)
     
     if len(lista_x > 0) and len(lista_y > 0):
-        linear_regressor.fit(lista_x, lista_y)  # perform linear regression
+        linear_regressor.fit(lista_y, lista_x)  # perform linear regression
             
-        X = np.array([0, frame.shape[1]]).reshape(-1, 1)
+        X = np.array([-10000, 10000]).reshape(-1, 1)
         Y_pred = linear_regressor.predict(X)  # make predictions
 
-        img_regres = cv2.line(frame, (int(X[0]),int(Y_pred[0])), (int(X[1]),int(Y_pred[1])), (0, 255, 0), thickness=3, lineType=8)
+        img_regres = cv2.line(frame, (int(X[0]),int(Y_pred[0])), (int(X[-1]),int(Y_pred[-1])), (0, 255, 0), thickness=3, lineType=8)
         
         #pontos da curva
-        X1 = X[0][0]
-        X2 = X[-1][0]
+        X1 = X[0]
+        X2 = X[-1]
         delta_X = X2 - X1
         
         medio_X = (X1+X2)/2
 
-        Y1 = Y_pred[0][0]
-        Y2 = Y_pred[-1][0]
+        Y1 = Y_pred[0]
+        Y2 = Y_pred[-1]
         delta_Y = Y2 - Y1
         medio_Y = (Y1+Y2)/2
         ponto_medio = (medio_X, medio_Y)
 
+        for i in range(len(lista_y)):
+            crosshair(frame,(int(lista_x[i]),int(lista_y[i])),size=10, color=(255, 255, 0))
         crosshair(frame, (int(medio_X),int(medio_Y)), size=10, color=(255, 255, 0))
 
         angulo_in = math.degrees(math.atan2(delta_X, delta_Y))
@@ -147,12 +155,12 @@ def processa_imagem(imagem): # CHECK
             angulo = angulo_in + 90
         else:
             angulo = angulo_in
-    print(angulo)
+        print(angulo)
     cv2.imshow("regressão", frame)
     return angulo, ponto_medio
 
 
-def percorrendo_pista(angulo, imagem, ponto_medio):        
+def percorrendo_pista(angulo, ponto_medio):        
     '''if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
         frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
@@ -163,10 +171,10 @@ def percorrendo_pista(angulo, imagem, ponto_medio):
         esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
         velocidade_saida.publish(esquerda)'''
 
-    if ponto_medio[0] > imagem.shape[1]/2+10:
+    if ponto_medio[0] > 640/2+10:
         direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
         velocidade_saida.publish(direita)
-    elif ponto_medio[0] < imagem.shape[1]/2-10:
+    elif ponto_medio[0] < 640/2-10:
         esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
         velocidade_saida.publish(esquerda)
     else:
@@ -247,7 +255,7 @@ if __name__=="__main__":
             for r in resultados:
                 print(r)
             
-            percorrendo_pista(theta, cv_image, ponto_medio)
+            percorrendo_pista(theta, ponto_medio)
             #velocidade_saida.publish(vel)
             rospy.sleep(0.1)
 
