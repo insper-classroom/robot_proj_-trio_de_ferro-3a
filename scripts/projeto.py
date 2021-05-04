@@ -89,25 +89,7 @@ def processa_imagem(imagem): # CHECK
     #Thresh
     ret, thresh = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
 
-    #Encontrando os contornos
-    contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-
-    """# encontrar centros de massa
-    lista_x = [] # coordenadas x
-    lista_y = [] # coordenadas y"""
-
-    """for c in contornos:
-
-        M = cv2.moments(c)
-
-        try:
-            cX = int(M["m10"] / M["m00"])
-            cY = int(M["m01"] / M["m00"])
-            crosshair(frame, (cX,cY), size=5, color=(0, 255, 0))
-            lista_x.append(cX)
-            lista_y.append(cY)
-        except:
-            print("passou")"""
+    
 
     #Encontrando os pontos brancos da mask para a regressão
     pontos_brancos = np.where(mask==255)
@@ -124,12 +106,52 @@ def processa_imagem(imagem): # CHECK
     lista_y = lista_y.reshape(-1,1)
     
     if len(lista_x) > 0 and len(lista_y) > 0:
-        linear_regressor.fit(lista_y, lista_x)  # perform linear regression
+        linear_regressor.fit(lista_y, lista_x)  # inveção do x e y para a regresão
             
         X = np.array([0, frame.shape[1]]).reshape(-1, 1)
         Y_pred = linear_regressor.predict(X)  # make predictions
-
         img_regres = cv2.line(frame, (int(Y_pred[0]),int(X[0])), (int(Y_pred[-1]),int(X[-1])), (0, 255, 0), thickness=3, lineType=8)
+
+
+        # voltando com as coordenadas do openCV:
+        X_cv = Y_pred
+        Y_cv = X
+
+        #Encontrando os contornos
+
+        # encontrar centros de massa
+        lista_x = [] # coordenadas x
+        lista_y = [] # coordenadas y
+
+        contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        ### MAIOR CONTORNO
+        maior = None
+        maior_area = 0
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if area > maior_area:
+                maior_area = area
+                maior = c
+
+            M = cv2.moments(maior)
+
+            try:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                crosshair(frame, (cX,cY), size=10, color=(0, 0, 255))
+            except:
+                print("passou")
+
+        
+
+
+        #index_ponto_base_y = Y_pred.index([frame.shape[1]])
+        #ponto_base_x = X[index_ponto_base_y]
+
+
+        #crosshair(frame, (int(ponto_base_x),int(frame.shape[1])), size=10, color=(255, 255, 255))
+
         
         #pontos da curva
         X1 = X[0]
@@ -254,7 +276,7 @@ if __name__=="__main__":
             for r in resultados:
                 print(r)
             
-            percorrendo_pista(theta, ponto_medio)
+            #percorrendo_pista(theta, ponto_medio)
             #velocidade_saida.publish(vel)
             rospy.sleep(0.1)
 
