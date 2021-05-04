@@ -33,7 +33,7 @@ theta = 0.0
 media = []
 centro = []
 atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
-
+linear_regressor = LinearRegression()
 
 area = 0.0 # Variavel com a area do maior contorno
 
@@ -109,26 +109,27 @@ def processa_imagem(imagem): # CHECK
         except:
             print("passou")"""
 
+    #Encontrando os pontos brancos da mask para a regressão
     pontos_brancos = np.where(mask==255)
     lista_x = pontos_brancos[1]
     lista_y = pontos_brancos[0]
     
     print(lista_x)
 
-    linear_regressor = LinearRegression()  # create object for the class
+    #linear_regressor = LinearRegression()  # create object for the class
 
     lista_x = np.array(lista_x)
     lista_x = lista_x.reshape(-1,1)
     lista_y = np.array(lista_y)
     lista_y = lista_y.reshape(-1,1)
     
-    if len(lista_x > 0) and len(lista_y > 0):
+    if len(lista_x) > 0 and len(lista_y) > 0:
         linear_regressor.fit(lista_y, lista_x)  # perform linear regression
             
-        X = np.array([-10000, 10000]).reshape(-1, 1)
+        X = np.array([0, frame.shape[1]]).reshape(-1, 1)
         Y_pred = linear_regressor.predict(X)  # make predictions
 
-        img_regres = cv2.line(frame, (int(X[0]),int(Y_pred[0])), (int(X[-1]),int(Y_pred[-1])), (0, 255, 0), thickness=3, lineType=8)
+        img_regres = cv2.line(frame, (int(Y_pred[0]),int(X[0])), (int(Y_pred[-1]),int(X[-1])), (0, 255, 0), thickness=3, lineType=8)
         
         #pontos da curva
         X1 = X[0]
@@ -143,8 +144,6 @@ def processa_imagem(imagem): # CHECK
         medio_Y = (Y1+Y2)/2
         ponto_medio = (medio_X, medio_Y)
 
-        for i in range(len(lista_y)):
-            crosshair(frame,(int(lista_x[i]),int(lista_y[i])),size=10, color=(255, 255, 0))
         crosshair(frame, (int(medio_X),int(medio_Y)), size=10, color=(255, 255, 0))
 
         angulo_in = math.degrees(math.atan2(delta_X, delta_Y))
