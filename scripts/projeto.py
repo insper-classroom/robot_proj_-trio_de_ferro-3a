@@ -34,8 +34,10 @@ media = []
 centro = []
 atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
 linear_regressor = LinearRegression()
-
+largura_tela = 640
 area = 0.0 # Variavel com a area do maior contorno
+cX =0
+cY =0
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
 # Descarta imagens que chegam atrasadas demais
@@ -55,6 +57,28 @@ tfl = 0
 
 tf_buffer = tf2_ros.Buffer()
 
+topico_odom = "/odom"
+
+# Apenas valores para inicializar odometria
+x = -1000
+y = -1000
+z = -1000
+
+def recebeu_leitura(dado):
+    """
+        Grava nas variáveis x,y,z a posição extraída da odometria
+        Atenção: *não coincidem* com o x,y,z locais do drone
+    """
+    global x
+    global y 
+    global z 
+
+    x = dado.pose.pose.position.x
+    y = dado.pose.pose.position.y
+    z = dado.pose.pose.position.z
+
+    print("odometria", x,y)
+
 def crosshair(img, point, size, color):
     """ Desenha um crosshair centrado no point.
         point deve ser uma tupla (x,y)
@@ -69,9 +93,21 @@ def processa_imagem(imagem): # CHECK
     '''
     recebe imagem e devolve o angulo da regressao com a horizontal
     '''
+        
+
 
     # Filtrando amarelos:
     frame = imagem.copy()
+
+    # Na bifurcacao: ele olha so para a direita 
+
+    x_bifurcacao = -2.29 #obtido pela odometria
+    y_bifurcacao = -0.13 #obtido pela odometria
+
+    if ((x-x_bifurcacao)**2 + (y-y_bifurcacao)**2)**0.5 <= 2: #circulo que abrange o ponto
+        recorte = frame[0.6*largura_tela,:,:]
+
+
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
 
@@ -140,11 +176,12 @@ def processa_imagem(imagem): # CHECK
                 cX = int(M["m10"] / M["m00"])
                 cY = int(M["m01"] / M["m00"])
                 crosshair(frame, (cX,cY), size=10, color=(0, 0, 255))
+                cv2.imshow("regressão", frame)
+                return cX, cY
+                
             except:
+                cv2.imshow("regressão", frame)
                 print("passou")
-
-        
-
 
         #index_ponto_base_y = Y_pred.index([frame.shape[1]])
         #ponto_base_x = X[index_ponto_base_y]
@@ -152,9 +189,9 @@ def processa_imagem(imagem): # CHECK
 
         #crosshair(frame, (int(ponto_base_x),int(frame.shape[1])), size=10, color=(255, 255, 255))
 
-        
         #pontos da curva
-        X1 = X[0]
+
+        """X1 = X[0]
         X2 = X[-1]
         delta_X = X2 - X1
         
@@ -176,12 +213,12 @@ def processa_imagem(imagem): # CHECK
             angulo = angulo_in + 90
         else:
             angulo = angulo_in
-        print(angulo)
-    cv2.imshow("regressão", frame)
-    return angulo, ponto_medio
+        print(angulo)"""
+    
+    return 0,0
+    
 
-
-def percorrendo_pista(angulo, ponto_medio):        
+def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):        
     '''if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
         frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
@@ -192,7 +229,7 @@ def percorrendo_pista(angulo, ponto_medio):
         esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
         velocidade_saida.publish(esquerda)'''
 
-    if ponto_medio[0] > 640/2+10:
+    """if ponto_medio[0] > 640/2+10:
         direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
         velocidade_saida.publish(direita)
     elif ponto_medio[0] < 640/2-10:
@@ -200,7 +237,23 @@ def percorrendo_pista(angulo, ponto_medio):
         velocidade_saida.publish(esquerda)
     else:
         frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
+        velocidade_saida.publish(frente)"""
+
+    # Loop principal: centraliza no centro do maior contorno amarelo
+    global largura_tela
+
+    if (largura_tela/2 - 20) < x_centro_amarelo < (largura_tela/2 + 20):
+        frente = Twist(Vector3(0.12,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
+
+    elif (largura_tela/2 - 20) > x_centro_amarelo:
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
+        velocidade_saida.publish(direita)
+    
+    elif (largura_tela/2 + 20) < x_centro_amarelo:
+        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+        velocidade_saida.publish(esquerda)
+
 
     return None
 
@@ -212,8 +265,8 @@ def roda_todo_frame(imagem):
     global media
     global centro
     global resultados
-    global theta
-    global ponto_medio
+    global cY
+    global cX
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -239,7 +292,8 @@ def roda_todo_frame(imagem):
         
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
-        theta, ponto_medio = processa_imagem(cv_image)
+        cX, cY = processa_imagem(cv_image)
+        
 
 
 
@@ -255,7 +309,7 @@ if __name__=="__main__":
     topico_imagem = "/camera/image/compressed"
 
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
-
+    recebe_scan = rospy.Subscriber(topico_odom, Odometry , recebeu_leitura)
 
     print("Usando ", topico_imagem)
 
@@ -278,6 +332,7 @@ if __name__=="__main__":
             
             #percorrendo_pista(theta, ponto_medio)
             #velocidade_saida.publish(vel)
+            percorrendo_pista(cX,cY)
             rospy.sleep(0.1)
 
     except rospy.ROSInterruptException:
