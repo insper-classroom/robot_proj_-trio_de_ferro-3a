@@ -97,17 +97,21 @@ def processa_imagem(imagem): # CHECK
 
 
     # Filtrando amarelos:
-    frame_in = imagem.copy()
+    frame = imagem.copy()
+    global largura_tela 
 
     # Na bifurcacao: ele olha so para a direita 
 
-    x_bifurcacao = -2.29 #obtido pela odometria
-    y_bifurcacao = -0.13 #obtido pela odometria
+    x_bifurcacao = -2.59 #obtido pela odometria
+    y_bifurcacao = -0.109 #obtido pela odometria
 
-    if ((x-x_bifurcacao)**2 + (y-y_bifurcacao)**2)**0.5 <= 1: #circulo que abrange o ponto
-        frame = frame_in[:, int(0.4*largura_tela) : largura_tela]  #[y --> pega tudo,x --> pega somente os 60% da direita]
+    if ((x-x_bifurcacao)**2 + (y-y_bifurcacao)**2)**0.5 <= 0.5: #circulo que abrange o ponto
+        largura_tela = 250
+        print("Entrei aqui")
+        crosshair(frame, (int(largura_tela/2),190), 3, (255,255,255))
     else:
-        frame = frame_in
+        largura_tela = 640
+    
 
 
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -216,7 +220,10 @@ def processa_imagem(imagem): # CHECK
         else:
             angulo = angulo_in
         print(angulo)"""
-    
+    else:
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+        velocidade_saida.publish(direita)
+
     return 0,0
     
 
@@ -249,11 +256,11 @@ def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):
         velocidade_saida.publish(frente)
 
     elif (largura_tela/2 - 20) > x_centro_amarelo:
-        direita = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
+        direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.1))
         velocidade_saida.publish(direita)
     
     elif (largura_tela/2 + 20) < x_centro_amarelo:
-        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+        esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.1))
         velocidade_saida.publish(esquerda)
 
 
