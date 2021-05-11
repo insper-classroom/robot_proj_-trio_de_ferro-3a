@@ -16,6 +16,7 @@ from tf import transformations
 from tf import TransformerROS
 import tf2_ros
 from geometry_msgs.msg import Twist, Vector3, Pose, Vector3Stamped
+import cv2.aruco as aruco
 
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
@@ -93,8 +94,6 @@ def processa_imagem(imagem): # CHECK
     '''
     recebe imagem e devolve o angulo da regressao com a horizontal
     '''
-        
-
 
     # Filtrando amarelos:
     frame = imagem.copy()
@@ -102,10 +101,52 @@ def processa_imagem(imagem): # CHECK
 
     # Na bifurcacao: ele olha so para a direita 
 
-    x_bifurcacao = -2.59 #obtido pela odometria
-    y_bifurcacao = -0.109 #obtido pela odometria
+    # ARUCO:
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    if ((x-x_bifurcacao)**2 + (y-y_bifurcacao)**2)**0.5 <= 0.5: #circulo que abrange o ponto
+    aruco_dict  = aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
+    corners, ids, rejectedImgPoints = aruco.detectMarkers(gray, aruco_dict)
+
+    if ids is not None:
+
+        for i in range(len(ids)):
+                print('ID: {}'.format(ids[i]))
+                
+                for c in corners[i]:
+                    for canto in c:
+                        print("Corner {}".format(canto))
+        print("CORNER", corners[i])
+
+        aruco.drawDetectedMarkers(frame, corners, ids)
+
+        calib_path  = "/home/borg/catkin_ws/src/robot202/ros/exemplos202/scripts/"
+        camera_matrix   = np.loadtxt(calib_path+'cameraMatrix_raspi.txt', delimiter=',')
+        camera_distortion   = np.loadtxt(calib_path+'cameraDistortion_raspi.txt', delimiter=',')
+
+        marker_size = 20
+
+
+        ret = aruco.estimatePoseSingleMarkers(corners, marker_size, camera_matrix, camera_distortion)
+        rvec, tvec = ret[0][0,0,:], ret[1][0,0,:]
+
+        distance = np.sqrt(tvec[0]**2 + tvec[1]**2 + tvec[2]**2)
+        distancenp = np.linalg.norm(tvec)
+
+
+
+        str_dist = "Dist aruco=%4.0f  dis.np=%4.0f"%(distance, distancenp)
+        print(str_dist)
+        
+
+
+
+    x_bifurcacao1 = 10 #obtido pela odometria
+    y_bifurcacao1 = 10 #obtido pela odometria
+
+    x_bifurcacao2 = 10 #obtido pela odometria
+    y_bifurcacao2 = 10 #obtido pela odometria
+
+    if ((x-x_bifurcacao1)**2 + (y-y_bifurcacao1)**2)**0.5 <= 0.5: #circulo que abrange o ponto
         largura_tela = 250
         print("Entrei aqui")
         crosshair(frame, (int(largura_tela/2),190), 3, (255,255,255))
@@ -152,7 +193,7 @@ def processa_imagem(imagem): # CHECK
             
         X = np.array([0, frame.shape[1]]).reshape(-1, 1)
         Y_pred = linear_regressor.predict(X)  # make predictions
-        img_regres = cv2.line(frame, (int(Y_pred[0]),int(X[0])), (int(Y_pred[-1]),int(X[-1])), (0, 255, 0), thickness=3, lineType=8)
+        #img_regres = cv2.line(frame, (int(Y_pred[0]),int(X[0])), (int(Y_pred[-1]),int(X[-1])), (0, 255, 0), thickness=3, lineType=8)
 
 
         # voltando com as coordenadas do openCV:
@@ -220,9 +261,10 @@ def processa_imagem(imagem): # CHECK
         else:
             angulo = angulo_in
         print(angulo)"""
-    else:
-        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
+    else: # QUANDO O ROBO NÃO VE NADA AMARELO
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.3))
         velocidade_saida.publish(direita)
+        cv2.imshow("regressão", frame)
 
     return 0,0
     
@@ -252,7 +294,7 @@ def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):
     global largura_tela
 
     if (largura_tela/2 - 20) < x_centro_amarelo < (largura_tela/2 + 20):
-        frente = Twist(Vector3(0.1,0,0), Vector3(0,0,0))
+        frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
 
     elif (largura_tela/2 - 20) > x_centro_amarelo:
@@ -301,7 +343,7 @@ def roda_todo_frame(imagem):
         
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
-        cX, cY = processa_imagem(cv_image)
+        cX, cY = processa_imagem(temp_image)
         
 
 
