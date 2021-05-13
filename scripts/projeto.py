@@ -20,6 +20,7 @@ import cv2.aruco as aruco
 
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
+from termcolor import colored
 
 
 import visao_module
@@ -39,6 +40,11 @@ largura_tela = 640
 area = 0.0 # Variavel com a area do maior contorno
 cX =0
 cY =0
+x_bifurcacao1 = 10 #obtido pela odometria
+y_bifurcacao1 = 10 #obtido pela odometria
+
+x_bifurcacao2 = 10 #obtido pela odometria
+y_bifurcacao2 = 10 #obtido pela odometria
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
 # Descarta imagens que chegam atrasadas demais
@@ -98,6 +104,10 @@ def processa_imagem(imagem): # CHECK
     # Filtrando amarelos:
     frame = imagem.copy()
     global largura_tela 
+    global x_bifurcacao1
+    global x_bifurcacao2
+    global y_bifurcacao1
+    global y_bifurcacao2
 
     # Na bifurcacao: ele olha so para a direita 
 
@@ -109,13 +119,7 @@ def processa_imagem(imagem): # CHECK
 
     if ids is not None:
 
-        for i in range(len(ids)):
-                print('ID: {}'.format(ids[i]))
-                
-                for c in corners[i]:
-                    for canto in c:
-                        print("Corner {}".format(canto))
-        print("CORNER", corners[i])
+        
 
         aruco.drawDetectedMarkers(frame, corners, ids)
 
@@ -136,18 +140,31 @@ def processa_imagem(imagem): # CHECK
 
         str_dist = "Dist aruco=%4.0f  dis.np=%4.0f"%(distance, distancenp)
         print(str_dist)
+
+        for i in range(len(ids)):
+                print('ID: {}'.format(ids[i]))
+                print("Distancia = ",distance)
+                for c in corners[i]:
+                    for canto in c:
+                        if ids[0] == 100 and (65 <= distance <= 85):
+                            x_bifurcacao1 = x 
+                            y_bifurcacao1 = y
+                            print("Entrei aqui!")
+                        if ids[0] == 200 and (45 <= distance <= 65):
+                            x_bifurcacao2 = x
+                            y_bifurcacao2 = y
+
+
+                        print("Corner {}".format(canto))
+        print("CORNER", corners[i])
         
 
 
 
-    x_bifurcacao1 = 10 #obtido pela odometria
-    y_bifurcacao1 = 10 #obtido pela odometria
+    
 
-    x_bifurcacao2 = 10 #obtido pela odometria
-    y_bifurcacao2 = 10 #obtido pela odometria
-
-    if ((x-x_bifurcacao1)**2 + (y-y_bifurcacao1)**2)**0.5 <= 0.5: #circulo que abrange o ponto
-        largura_tela = 250
+    if (((x-x_bifurcacao1)**2 + (y-y_bifurcacao1)**2)**0.5 <= 0.6 )or (((x-x_bifurcacao2)**2 + (y-y_bifurcacao2)**2)**0.5 <= 0.6): #circulo que abrange o ponto
+        largura_tela = 200
         print("Entrei aqui")
         crosshair(frame, (int(largura_tela/2),190), 3, (255,255,255))
     else:
@@ -265,30 +282,13 @@ def processa_imagem(imagem): # CHECK
         direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.3))
         velocidade_saida.publish(direita)
         cv2.imshow("regressão", frame)
+        a = colored('Estou rodando','red')
+        print(a)
 
     return 0,0
     
 
 def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):        
-    '''if 50 < angulo < 130: #se o angulo for entre 80 e 100, o robô vai reto
-        frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
-        velocidade_saida.publish(frente)
-    elif angulo < 50:
-        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
-        velocidade_saida.publish(direita)
-    elif angulo > 130:
-        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
-        velocidade_saida.publish(esquerda)'''
-
-    """if ponto_medio[0] > 640/2+10:
-        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.1))
-        velocidade_saida.publish(direita)
-    elif ponto_medio[0] < 640/2-10:
-        esquerda = Twist(Vector3(0,0,0), Vector3(0,0,0.1))
-        velocidade_saida.publish(esquerda)
-    else:
-        frente = Twist(Vector3(0.25,0,0), Vector3(0,0,0))
-        velocidade_saida.publish(frente)"""
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
@@ -298,11 +298,11 @@ def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):
         velocidade_saida.publish(frente)
 
     elif (largura_tela/2 - 20) > x_centro_amarelo:
-        direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.1))
+        direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.2))
         velocidade_saida.publish(direita)
     
     elif (largura_tela/2 + 20) < x_centro_amarelo:
-        esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.1))
+        esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.2))
         velocidade_saida.publish(esquerda)
 
 
@@ -387,4 +387,4 @@ if __name__=="__main__":
             rospy.sleep(0.1)
 
     except rospy.ROSInterruptException:
-        print("Ocorreu uma exceção com o rospy")
+        print ("Ocorreu uma exceção com o rospy")
