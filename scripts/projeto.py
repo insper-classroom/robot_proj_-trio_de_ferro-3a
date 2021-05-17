@@ -308,6 +308,43 @@ def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):
 
     return None
 
+def encontra_creepers(imagem_in):
+
+    imagem = imagem_in.copy() 
+    hsv = cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV)
+
+    #### Segmentando cores
+
+    hsv1_orange = (0, 150, 150)
+    hsv2_orange = (20, 255, 255)
+
+    hsv1_verde = (55, 150, 150)
+    hsv2_verde = (80, 255, 255)
+
+    hsv1_ciano = (80, 150, 150)
+    hsv2_ciano = (100, 255, 255)
+
+    ### Fazendo masks
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(6,6))
+    
+    mask_orange = cv2.inRange(hsv, hsv1_orange, hsv2_orange)
+    mask_orange = cv2.erode(mask_orange,kernel,iterations = 1)
+
+    mask_verde = cv2.inRange(hsv, hsv1_verde, hsv2_verde)
+    mask_verde = cv2.erode(mask_verde,kernel,iterations = 1)
+
+    mask_ciano = cv2.inRange(hsv, hsv1_ciano, hsv2_ciano)
+    mask_ciano = cv2.erode(mask_ciano,kernel,iterations = 1)
+
+    cv2.imshow("mask vermelho", mask_orange)
+    cv2.imshow("mask verde", mask_verde)
+    cv2.imshow("mask ciano", mask_ciano)
+
+    return None
+
+
+
 
 # A função a seguir é chamada sempre que chega um novo frame
 def roda_todo_frame(imagem):
@@ -344,6 +381,7 @@ def roda_todo_frame(imagem):
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
         cX, cY = processa_imagem(temp_image)
+        encontra_creepers(temp_image)
         
 
 
