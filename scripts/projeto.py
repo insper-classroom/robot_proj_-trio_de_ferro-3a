@@ -40,6 +40,9 @@ largura_tela = 640
 area = 0.0 # Variavel com a area do maior contorno
 cX =0
 cY =0
+centro_x_creeper=0
+centro_y_creeper=0
+area = 0
 x_bifurcacao1 = 10 #obtido pela odometria
 y_bifurcacao1 = 10 #obtido pela odometria
 
@@ -157,10 +160,6 @@ def processa_imagem(imagem): # CHECK
 
                         print("Corner {}".format(canto))
         print("CORNER", corners[i])
-        
-
-
-
     
 
     if (((x-x_bifurcacao1)**2 + (y-y_bifurcacao1)**2)**0.5 <= 0.6 )or (((x-x_bifurcacao2)**2 + (y-y_bifurcacao2)**2)**0.5 <= 0.6): #circulo que abrange o ponto
@@ -255,29 +254,6 @@ def processa_imagem(imagem): # CHECK
 
         #pontos da curva
 
-        """X1 = X[0]
-        X2 = X[-1]
-        delta_X = X2 - X1
-        
-        medio_X = (X1+X2)/2
-
-        Y1 = Y_pred[0]
-        Y2 = Y_pred[-1]
-        delta_Y = Y2 - Y1
-        medio_Y = (Y1+Y2)/2
-        ponto_medio = (medio_X, medio_Y)
-
-        crosshair(frame, (int(medio_X),int(medio_Y)), size=10, color=(255, 255, 0))
-
-        angulo_in = math.degrees(math.atan2(delta_X, delta_Y))
-
-        if 180 > angulo_in > 90:
-            angulo = angulo_in - 90
-        elif angulo_in < 90:
-            angulo = angulo_in + 90
-        else:
-            angulo = angulo_in
-        print(angulo)"""
     else: # QUANDO O ROBO NÃO VE NADA AMARELO
         direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.3))
         velocidade_saida.publish(direita)
@@ -288,20 +264,20 @@ def processa_imagem(imagem): # CHECK
     return 0,0
     
 
-def percorrendo_pista(x_centro_amarelo, y_centro_amarelo):        
+def centraliza_crosshair(x_centro, y_centro):        
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
 
-    if (largura_tela/2 - 20) < x_centro_amarelo < (largura_tela/2 + 20):
+    if (largura_tela/2 - 20) < x_centro < (largura_tela/2 + 20):
         frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
         velocidade_saida.publish(frente)
 
-    elif (largura_tela/2 - 20) > x_centro_amarelo:
+    elif (largura_tela/2 - 20) > x_centro:
         direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.2))
         velocidade_saida.publish(direita)
     
-    elif (largura_tela/2 + 20) < x_centro_amarelo:
+    elif (largura_tela/2 + 20) < x_centro:
         esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.2))
         velocidade_saida.publish(esquerda)
 
@@ -348,7 +324,7 @@ def encontra_creepers(imagem_in):
         ret, thresh = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
         contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
-            ### MAIOR CONTORNO
+        ### MAIOR CONTORNO
         maior = None
         maior_area = 0
         for c in contornos:
@@ -364,17 +340,13 @@ def encontra_creepers(imagem_in):
                 cY = int(M["m01"] / M["m00"])
                 crosshair(imagem, (cX,cY), size=10, color=(0, 0, 255))
                 cv2.imshow("regressão", imagem)
-                return cX, cY
+                return cX, cY, area
                 
             except:
                 b = colored("caiu aqui", "green")
                 print(b)
 
-
-    return None
-
-
-
+    return None, None, None
 
 # A função a seguir é chamada sempre que chega um novo frame
 def roda_todo_frame(imagem):
@@ -385,6 +357,9 @@ def roda_todo_frame(imagem):
     global resultados
     global cY
     global cX
+    global area
+    global centro_x_creeper
+    global centro_y_creeper
 
     now = rospy.get_rostime()
     imgtime = imagem.header.stamp
@@ -411,7 +386,7 @@ def roda_todo_frame(imagem):
         # Desnecessário - Hough e MobileNet já abrem janelas
         cv_image = saida_net.copy()
         cX, cY = processa_imagem(temp_image)
-        encontra_creepers(temp_image)
+        centro_x_creeper, centro_y_creeper, area = encontra_creepers(temp_image)
         
 
 
@@ -438,8 +413,58 @@ if __name__=="__main__":
     tolerancia = 25
 
     #CRIAÇÃO DE ESTADOS:
-    ANDANDO = 0
+    ANDANDO_PISTA = 0
+    AVANCANDO_CREEPER = 1
+    SEGURANDO_CREEPER = 2
+    VOLTANDO_PISTA = 3
+    ACHANDO_BASE = 4
+    SOLTANDO_CREEPER = 5
 
+    state = ANDANDO_PISTA
+
+    def andando_pista():
+        global cX
+        global cY
+        centraliza_crosshair(cX,cY) # percorre pista, centralizando no maior contorno amarelo
+        return None
+
+    def avancando_creeper():
+        print('avancando creeper')
+        global centro_x_creeper
+        global centro_y_creeper
+        centraliza_crosshair(centro_x_creeper, centro_y_creeper)
+        return None
+
+    def segurando_creeper():
+        return None
+
+    def voltando_pista():
+        return None
+    
+    def achando_base():
+        return None
+
+    def soltando_creeper():
+        return None
+
+    def dispatch():
+        global state
+        global area
+        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
+            state = AVANCANDO_CREEPER
+        
+        return None
+
+
+
+    acoes = {
+        ANDANDO_PISTA: andando_pista,
+        AVANCANDO_CREEPER: avancando_creeper,
+        SEGURANDO_CREEPER: segurando_creeper,
+        VOLTANDO_PISTA:voltando_pista,
+        ACHANDO_BASE: achando_base,
+        SOLTANDO_CREEPER: soltando_creeper
+        }
 
     try:
         # Inicializando - por default gira no sentido anti-horário
@@ -448,10 +473,10 @@ if __name__=="__main__":
         while not rospy.is_shutdown():
             for r in resultados:
                 print(r)
-            
+            dispatch()
             #percorrendo_pista(theta, ponto_medio)
             #velocidade_saida.publish(vel)
-            percorrendo_pista(cX,cY)
+            acoes[state]()
             rospy.sleep(0.1)
 
     except rospy.ROSInterruptException:
