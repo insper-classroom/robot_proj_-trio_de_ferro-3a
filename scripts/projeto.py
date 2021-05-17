@@ -315,7 +315,7 @@ def encontra_creepers(imagem_in):
 
     #### Segmentando cores
 
-    hsv1_orange = (0, 150, 150)
+    hsv1_orange = (0, 250, 250)
     hsv2_orange = (20, 255, 255)
 
     hsv1_verde = (55, 150, 150)
@@ -326,20 +326,50 @@ def encontra_creepers(imagem_in):
 
     ### Fazendo masks
 
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(6,6))
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(4,4))
     
     mask_orange = cv2.inRange(hsv, hsv1_orange, hsv2_orange)
-    mask_orange = cv2.erode(mask_orange,kernel,iterations = 1)
+    mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_OPEN, kernel)
 
     mask_verde = cv2.inRange(hsv, hsv1_verde, hsv2_verde)
-    mask_verde = cv2.erode(mask_verde,kernel,iterations = 1)
+    mask_verde = cv2.morphologyEx(mask_verde, cv2.MORPH_OPEN, kernel)
 
     mask_ciano = cv2.inRange(hsv, hsv1_ciano, hsv2_ciano)
-    mask_ciano = cv2.erode(mask_ciano,kernel,iterations = 1)
+    mask_ciano = cv2.morphologyEx(mask_ciano, cv2.MORPH_OPEN, kernel)
 
     cv2.imshow("mask vermelho", mask_orange)
     cv2.imshow("mask verde", mask_verde)
     cv2.imshow("mask ciano", mask_ciano)
+
+    list_masks = [mask_orange, mask_ciano, mask_verde]
+
+    for mask in list_masks:
+
+        ret, thresh = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
+        contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+            ### MAIOR CONTORNO
+        maior = None
+        maior_area = 0
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if area > maior_area:
+                maior_area = area
+                maior = c
+
+            M = cv2.moments(maior)
+
+            try:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                crosshair(imagem, (cX,cY), size=10, color=(0, 0, 255))
+                cv2.imshow("regressão", imagem)
+                return cX, cY
+                
+            except:
+                b = colored("caiu aqui", "green")
+                print(b)
+
 
     return None
 
