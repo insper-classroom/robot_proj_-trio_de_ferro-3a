@@ -48,7 +48,7 @@ y_bifurcacao1 = 10 #obtido pela odometria
 
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
-objetivo = ('blue',12, 'dog')
+objetivo = ('orange',12, 'dog')
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
 # Descarta imagens que chegam atrasadas demais
@@ -324,6 +324,7 @@ def encontra_creepers(imagem_in):
         hsv2_orange = (20, 255, 255)
 
         mask_orange = cv2.inRange(hsv, hsv1_orange, hsv2_orange)
+        mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_CLOSE, kernel)
         mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_OPEN, kernel)
         cv2.imshow("mask vermelho", mask_orange)
 
