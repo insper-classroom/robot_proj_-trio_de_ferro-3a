@@ -48,6 +48,7 @@ y_bifurcacao1 = 10 #obtido pela odometria
 
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
+objetivo = ('blue',12, 'dog')
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
 # Descarta imagens que chegam atrasadas demais
@@ -255,73 +256,78 @@ def processa_imagem(imagem): # CHECK
         #pontos da curva
 
     else: # QUANDO O ROBO NÃO VE NADA AMARELO
-        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.3))
-        velocidade_saida.publish(direita)
         cv2.imshow("regressão", frame)
-        a = colored('Estou rodando','red')
-        print(a)
 
-    return 0,0
+    return None,None
     
 
-def centraliza_crosshair(x_centro, y_centro):        
+def centraliza_creeper(x_centro, y_centro):        
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
 
-    if (largura_tela/2 - 20) < x_centro < (largura_tela/2 + 20):
-        frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
-        velocidade_saida.publish(frente)
+    if x_centro != None:
+        if (largura_tela/2 - 20) < x_centro < (largura_tela/2 + 20):
+            frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
+            velocidade_saida.publish(frente)
 
-    elif (largura_tela/2 - 20) > x_centro:
-        direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.2))
-        velocidade_saida.publish(direita)
+        elif (largura_tela/2 - 20) > x_centro:
+            direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.2))
+            velocidade_saida.publish(direita)
+        
+        elif (largura_tela/2 + 20) < x_centro:
+            esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.2))
+            velocidade_saida.publish(esquerda)
+
+
+    return None
+
+def centraliza_pista(x_centro, y_centro):        
+
+    # Loop principal: centraliza no centro do maior contorno amarelo
+    global largura_tela
+
+    if x_centro != None:
+        if (largura_tela/2 - 20) < x_centro < (largura_tela/2 + 20):
+            frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
+            velocidade_saida.publish(frente)
+
+        elif (largura_tela/2 - 20) > x_centro:
+            direita = Twist(Vector3(0.05,0,0), Vector3(0,0,0.2))
+            velocidade_saida.publish(direita)
+        
+        elif (largura_tela/2 + 20) < x_centro:
+            esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.2))
+            velocidade_saida.publish(esquerda)
     
-    elif (largura_tela/2 + 20) < x_centro:
-        esquerda = Twist(Vector3(0.05,0,0), Vector3(0,0,-0.2))
-        velocidade_saida.publish(esquerda)
+    else:
+        direita = Twist(Vector3(0,0,0), Vector3(0,0,-0.3))
+        velocidade_saida.publish(direita)
+        a = colored('Estou rodando','red')
+        print(a)
+        
 
 
     return None
 
 def encontra_creepers(imagem_in):
+    global objetivo
 
     imagem = imagem_in.copy() 
     hsv = cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV)
 
-    #### Segmentando cores
-
-    hsv1_orange = (0, 250, 250)
-    hsv2_orange = (20, 255, 255)
-
-    hsv1_verde = (55, 150, 150)
-    hsv2_verde = (80, 255, 255)
-
-    hsv1_ciano = (80, 150, 150)
-    hsv2_ciano = (100, 255, 255)
-
-    ### Fazendo masks
-
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(4,4))
-    
-    mask_orange = cv2.inRange(hsv, hsv1_orange, hsv2_orange)
-    mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_OPEN, kernel)
 
-    mask_verde = cv2.inRange(hsv, hsv1_verde, hsv2_verde)
-    mask_verde = cv2.morphologyEx(mask_verde, cv2.MORPH_OPEN, kernel)
+    #### Segmentando cores
+    if objetivo[0] == 'orange':
+        hsv1_orange = (0, 250, 250)
+        hsv2_orange = (20, 255, 255)
 
-    mask_ciano = cv2.inRange(hsv, hsv1_ciano, hsv2_ciano)
-    mask_ciano = cv2.morphologyEx(mask_ciano, cv2.MORPH_OPEN, kernel)
+        mask_orange = cv2.inRange(hsv, hsv1_orange, hsv2_orange)
+        mask_orange = cv2.morphologyEx(mask_orange, cv2.MORPH_OPEN, kernel)
+        cv2.imshow("mask vermelho", mask_orange)
 
-    cv2.imshow("mask vermelho", mask_orange)
-    cv2.imshow("mask verde", mask_verde)
-    cv2.imshow("mask ciano", mask_ciano)
-
-    list_masks = [mask_orange, mask_ciano, mask_verde]
-
-    for mask in list_masks:
-
-        ret, thresh = cv2.threshold(mask, 200, 255, cv2.THRESH_BINARY)
+        ret, thresh = cv2.threshold(mask_orange, 200, 255, cv2.THRESH_BINARY)
         contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
         ### MAIOR CONTORNO
@@ -345,6 +351,77 @@ def encontra_creepers(imagem_in):
             except:
                 b = colored("caiu aqui", "green")
                 print(b)
+    
+    elif objetivo[0] == 'blue':
+        hsv1_ciano = (80, 150, 150)
+        hsv2_ciano = (100, 255, 255)
+
+        mask_ciano = cv2.inRange(hsv, hsv1_ciano, hsv2_ciano)
+        mask_ciano = cv2.morphologyEx(mask_ciano, cv2.MORPH_CLOSE, kernel)
+        mask_ciano = cv2.morphologyEx(mask_ciano, cv2.MORPH_OPEN, kernel)
+        cv2.imshow("mask ciano", mask_ciano)
+
+        ret, thresh = cv2.threshold(mask_ciano, 200, 255, cv2.THRESH_BINARY)
+        contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        ### MAIOR CONTORNO
+        maior = None
+        maior_area = 0
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if area > maior_area:
+                maior_area = area
+                maior = c
+
+            M = cv2.moments(maior)
+
+            try:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                crosshair(imagem, (cX,cY), size=10, color=(0, 0, 255))
+                cv2.imshow("regressão", imagem)
+                d = colored(["area", area], "yellow")
+                print(d)
+                return cX, cY, area
+                
+            except:
+                b = colored("caiu aqui", "green")
+                print(b)
+
+    elif objetivo[0] == 'green':
+        hsv1_verde = (55, 150, 150)
+        hsv2_verde = (80, 255, 255)
+
+        mask_verde = cv2.inRange(hsv, hsv1_verde, hsv2_verde)
+        mask_verde = cv2.morphologyEx(mask_verde, cv2.MORPH_OPEN, kernel)
+        cv2.imshow("mask verde", mask_verde)
+
+        ret, thresh = cv2.threshold(mask_verde, 200, 255, cv2.THRESH_BINARY)
+        contornos, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+        ### MAIOR CONTORNO
+        maior = None
+        maior_area = 0
+        for c in contornos:
+            area = cv2.contourArea(c)
+            if area > maior_area:
+                maior_area = area
+                maior = c
+
+            M = cv2.moments(maior)
+
+            try:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                crosshair(imagem, (cX,cY), size=10, color=(0, 0, 255))
+                cv2.imshow("regressão", imagem)
+                return cX, cY, area
+                
+            except:
+                b = colored("caiu aqui", "green")
+                print(b)
+
+
 
     return None, None, None
 
@@ -425,14 +502,15 @@ if __name__=="__main__":
     def andando_pista():
         global cX
         global cY
-        centraliza_crosshair(cX,cY) # percorre pista, centralizando no maior contorno amarelo
+        centraliza_pista(cX,cY) # percorre pista, centralizando no maior contorno amarelo
         return None
 
     def avancando_creeper():
-        print('avancando creeper')
+        e = colored('avancando creeper', 'magenta')
+        print(e)
         global centro_x_creeper
         global centro_y_creeper
-        centraliza_crosshair(centro_x_creeper, centro_y_creeper)
+        centraliza_creeper(centro_x_creeper, centro_y_creeper)
         return None
 
     def segurando_creeper():
@@ -451,7 +529,8 @@ if __name__=="__main__":
         global state
         global area
         if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
-            state = AVANCANDO_CREEPER
+            if area > 1250:
+                state = AVANCANDO_CREEPER
         
         return None
 
