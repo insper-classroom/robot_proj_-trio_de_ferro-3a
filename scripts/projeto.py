@@ -21,11 +21,27 @@ import cv2.aruco as aruco
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from termcolor import colored
+from sensor_msgs.msg import LaserScan
+from std_msgs.msg import Float64
 
 
 import visao_module
 
 from sklearn.linear_model import LinearRegression
+
+############ OBJETIVO #############
+
+objetivo = ('blue',12, 'dog')
+#objetivo = ('orage', 11, 'cow')
+#objetivo = ("green", 23, "horse")
+
+# PARA PERCORRER A PISTA TODA:
+#objetivo = ("percorre", 1, "pista")
+
+###################################
+
+
+
 
 bridge = CvBridge()
 
@@ -48,7 +64,7 @@ y_bifurcacao1 = 10 #obtido pela odometria
 
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
-objetivo = ('orange',12, 'dog')
+
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
 # Descarta imagens que chegam atrasadas demais
@@ -261,14 +277,14 @@ def processa_imagem(imagem): # CHECK
     return None,None
     
 
-def centraliza_creeper(x_centro, y_centro):        
+def centraliza_creeper(x_centro, y_centro):    
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
 
     if x_centro != None:
         if (largura_tela/2 - 20) < x_centro < (largura_tela/2 + 20):
-            frente = Twist(Vector3(0.15,0,0), Vector3(0,0,0))
+            frente = Twist(Vector3(0.1,0,0), Vector3(0,0,0))
             velocidade_saida.publish(frente)
 
         elif (largura_tela/2 - 20) > x_centro:
@@ -426,6 +442,21 @@ def encontra_creepers(imagem_in):
 
     return None, None, None
 
+
+colidiu = False
+
+def scaneou(dado):
+	print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
+	print("Leituras:")
+	global colidiu
+	leitura = np.array(dado.ranges).round(decimals=2)
+
+	if dado.ranges[0] < 0.20:
+		colidiu  = True
+	else:
+		colidiu = False
+
+
 # A função a seguir é chamada sempre que chega um novo frame
 def roda_todo_frame(imagem):
     print("frame")
@@ -482,6 +513,9 @@ if __name__=="__main__":
 
     recebedor = rospy.Subscriber(topico_imagem, CompressedImage, roda_todo_frame, queue_size=4, buff_size = 2**24)
     recebe_scan = rospy.Subscriber(topico_odom, Odometry , recebeu_leitura)
+    recebe_scan1 = rospy.Subscriber("/scan", LaserScan, scaneou)
+    ombro = rospy.Publisher("/joint1_position_controller/command", Float64, queue_size=1)
+    garra = rospy.Publisher("/joint2_position_controller/command", Float64, queue_size=1)
 
     print("Usando ", topico_imagem)
 
@@ -507,14 +541,32 @@ if __name__=="__main__":
         return None
 
     def avancando_creeper():
-        e = colored('avancando creeper', 'magenta')
+        e = colored('AVANCANDO CREEPER', 'red')
         print(e)
         global centro_x_creeper
         global centro_y_creeper
-        centraliza_creeper(centro_x_creeper, centro_y_creeper)
+        if not colidiu:
+            centraliza_creeper(centro_x_creeper, centro_y_creeper)
+        else:
+            para = Twist(Vector3(0,0,0), Vector3(0,0,0))
+            velocidade_saida.publish(para)
+            print(colored("PAREI", "red"))
+            garra.publish(-1.0)  ## abre
+            ombro.publish(-0.5) ## para frente
+            rospy.sleep(1.0)
+
+            garra.publish(0.0) ## fecha
+            rospy.sleep(1.0)
+            ombro.publish(1.5) ## para cima
+            
+            rospy.sleep(3.0)
+
+            #ombro.publish(0.0) ## para frente
+
         return None
 
     def segurando_creeper():
+        
         return None
 
     def voltando_pista():
@@ -532,7 +584,6 @@ if __name__=="__main__":
         if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
             if area > 1250:
                 state = AVANCANDO_CREEPER
-        
         return None
 
 
