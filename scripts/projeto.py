@@ -60,10 +60,12 @@ centro_y_creeper=0
 area = 0
 x_bifurcacao1 = 10 #obtido pela odometria
 y_bifurcacao1 = 10 #obtido pela odometria
-
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
 ids = None
+pegou_creeper = False
+voltei_pista = False
+maior_area_amarela=0
 
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
@@ -129,6 +131,7 @@ def processa_imagem(imagem): # CHECK
     global y_bifurcacao1
     global y_bifurcacao2
     global ids
+    global maior_area_amarela
 
     # Na bifurcacao: ele olha so para a direita 
 
@@ -244,11 +247,11 @@ def processa_imagem(imagem): # CHECK
 
         ### MAIOR CONTORNO
         maior = None
-        maior_area = 0
+        maior_area_amarela = 0
         for c in contornos:
             area = cv2.contourArea(c)
-            if area > maior_area:
-                maior_area = area
+            if area > maior_area_amarela:
+                maior_area_amarela = area
                 maior = c
 
             M = cv2.moments(maior)
@@ -329,6 +332,7 @@ def centraliza_pista(x_centro, y_centro):
 
 def encontra_creepers(imagem_in):
     global objetivo
+    global maior_area_amarela
 
     imagem = imagem_in.copy() 
     hsv = cv2.cvtColor(imagem, cv2.COLOR_BGR2HSV)
@@ -384,10 +388,10 @@ def encontra_creepers(imagem_in):
 
         ### MAIOR CONTORNO
         maior = None
-        maior_area = 0
+        maior_area_amarela = 0
         for c in contornos:
             area = cv2.contourArea(c)
-            if area > maior_area:
+            if area > maior_area_amarela:
                 maior_area = area
                 maior = c
 
@@ -528,10 +532,9 @@ if __name__=="__main__":
     #CRIAÇÃO DE ESTADOS:
     ANDANDO_PISTA = 0
     AVANCANDO_CREEPER = 1
-    SEGURANDO_CREEPER = 2
-    VOLTANDO_PISTA = 3
-    ACHANDO_BASE = 4
-    SOLTANDO_CREEPER = 5
+    VOLTANDO_PISTA = 2
+    ACHANDO_BASE = 3
+    SOLTANDO_CREEPER = 4
 
     state = ANDANDO_PISTA
 
@@ -539,9 +542,13 @@ if __name__=="__main__":
         global cX
         global cY
         centraliza_pista(cX,cY) # percorre pista, centralizando no maior contorno amarelo
+        e = colored('ANDANDO PISTA', 'red')
+        print(e)
         return None
 
     def avancando_creeper():
+        global pegou_creeper
+        pegou_creeper = False
         e = colored('AVANCANDO CREEPER', 'red')
         print(e)
         global centro_x_creeper
@@ -562,15 +569,23 @@ if __name__=="__main__":
             
             rospy.sleep(3.0)
 
+            pegou_creeper = True
+
             #ombro.publish(0.0) ## para frente
 
         return None
 
-    def segurando_creeper():
-        
-        return None
-
     def voltando_pista():
+        #global maior_area_amarela
+        global voltei_pista
+        voltei_pista = False
+        volta = Twist(Vector3(-0.1,0,0), Vector3(0,0,0))
+        velocidade_saida.publish(volta)
+        print(maior_area_amarela)
+        if maior_area_amarela > 500:
+            voltei_pista = True
+        e = colored('VOLTANDO PISTA', 'red')
+        print(e)
         return None
     
     def achando_base():
@@ -585,6 +600,12 @@ if __name__=="__main__":
         if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
             if area > 1100 and objetivo[1]==ids[0]:
                 state = AVANCANDO_CREEPER
+        elif pegou_creeper:
+            state = VOLTANDO_PISTA
+            if voltei_pista:
+                state=ANDANDO_PISTA
+        
+                
         return None
 
 
@@ -592,7 +613,6 @@ if __name__=="__main__":
     acoes = {
         ANDANDO_PISTA: andando_pista,
         AVANCANDO_CREEPER: avancando_creeper,
-        SEGURANDO_CREEPER: segurando_creeper,
         VOLTANDO_PISTA:voltando_pista,
         ACHANDO_BASE: achando_base,
         SOLTANDO_CREEPER: soltando_creeper
