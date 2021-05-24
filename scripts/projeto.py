@@ -17,7 +17,6 @@ from tf import TransformerROS
 import tf2_ros
 from geometry_msgs.msg import Twist, Vector3, Pose, Vector3Stamped
 import cv2.aruco as aruco
-
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from termcolor import colored
@@ -64,6 +63,7 @@ y_bifurcacao1 = 10 #obtido pela odometria
 
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
+ids = None
 
 
 # Só usar se os relógios ROS da Raspberry e do Linux desktop estiverem sincronizados. 
@@ -128,6 +128,7 @@ def processa_imagem(imagem): # CHECK
     global x_bifurcacao2
     global y_bifurcacao1
     global y_bifurcacao2
+    global ids
 
     # Na bifurcacao: ele olha so para a direita 
 
@@ -139,7 +140,7 @@ def processa_imagem(imagem): # CHECK
 
     if ids is not None:
 
-        
+        print("ids",ids)
 
         aruco.drawDetectedMarkers(frame, corners, ids)
 
@@ -451,13 +452,13 @@ def scaneou(dado):
 	global colidiu
 	leitura = np.array(dado.ranges).round(decimals=2)
 
-	if dado.ranges[0] < 0.20:
+	if dado.ranges[0] < 0.18 or dado.ranges[1] < 0.18 or dado.ranges[2] < 0.18 or dado.ranges[3] < 0.18 or dado.ranges[359] < 0.18 or dado.ranges[358] < 0.18 or dado.ranges[357] < 0.18 :
 		colidiu  = True
 	else:
 		colidiu = False
 
 
-# A função a seguir é chamada sempre que chega um novo frame
+# A função a seguir é chamada sempre que chega um novo frame 
 def roda_todo_frame(imagem):
     print("frame")
     global cv_image
@@ -582,7 +583,7 @@ if __name__=="__main__":
         global state
         global area
         if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
-            if area > 1250:
+            if area > 1100 and objetivo[1]==ids[0]:
                 state = AVANCANDO_CREEPER
         return None
 
