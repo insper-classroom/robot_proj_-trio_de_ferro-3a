@@ -30,9 +30,9 @@ from sklearn.linear_model import LinearRegression
 
 ############ OBJETIVO #############
 
-objetivo = ('blue',12, 'dog')
+#objetivo = ('blue',12, 'dog')
 #objetivo = ('orage', 11, 'cow')
-#objetivo = ("green", 23, "horse")
+objetivo = ("green", 23, "horse")
 
 # PARA PERCORRER A PISTA TODA:
 #objetivo = ("percorre", 1, "pista")
@@ -52,7 +52,7 @@ centro = []
 atraso = 1.5E9 # 1 segundo e meio. Em nanossegundos
 linear_regressor = LinearRegression()
 largura_tela = 640
-area = 0.0 # Variavel com a area do maior contorno
+area = 0 # Variavel com a area do maior contorno
 cX =0
 cY =0
 centro_x_creeper=0
@@ -106,7 +106,7 @@ def recebeu_leitura(dado):
     y = dado.pose.pose.position.y
     z = dado.pose.pose.position.z
 
-    print("odometria", x,y)
+    #print("odometria", x,y)
 
 def crosshair(img, point, size, color):
     """ Desenha um crosshair centrado no point.
@@ -120,7 +120,8 @@ def crosshair(img, point, size, color):
 
 def processa_imagem(imagem): # CHECK
     '''
-    recebe imagem e devolve o angulo da regressao com a horizontal
+    Recebe a imagem que o robo ve, realiza todos os processamentos necessários (detecção dos arucos, 
+    masks das faixas amarelas com o calculo do centro de massa, calculo da regressão...) e devolve os centros de massa da maior faixa amarela
     '''
 
     # Filtrando amarelos:
@@ -163,30 +164,30 @@ def processa_imagem(imagem): # CHECK
 
 
         str_dist = "Dist aruco=%4.0f  dis.np=%4.0f"%(distance, distancenp)
-        print(str_dist)
+        #print(str_dist)
 
         for i in range(len(ids)):
-                print('ID: {}'.format(ids[i]))
-                print("Distancia = ",distance)
+                print(colored(f'ID: {ids[i]}', "red"))
+                #print("Distancia = ",distance)
                 for c in corners[i]:
                     for canto in c:
                         if ids[0] == 100 and (65 <= distance <= 85):
                             x_bifurcacao1 = x 
                             y_bifurcacao1 = y
-                            print("Entrei aqui!")
+                            #print("Entrei aqui!")
                         if ids[0] == 200 and (45 <= distance <= 65):
                             x_bifurcacao2 = x
                             y_bifurcacao2 = y
 
 
-                        print("Corner {}".format(canto))
-        print("CORNER", corners[i])
+                        #print("Corner {}".format(canto))
+        #print("CORNER", corners[i])
     
 
     if (((x-x_bifurcacao1)**2 + (y-y_bifurcacao1)**2)**0.5 <= 0.6 )or (((x-x_bifurcacao2)**2 + (y-y_bifurcacao2)**2)**0.5 <= 0.6): #circulo que abrange o ponto
         largura_tela = 200
-        print("Entrei aqui")
-        crosshair(frame, (int(largura_tela/2),190), 3, (255,255,255))
+        #print("Entrei aqui")
+        crosshair(frame, (int(largura_tela/2),190), 3, (235,235,235))
     else:
         largura_tela = 640
     
@@ -216,7 +217,7 @@ def processa_imagem(imagem): # CHECK
     lista_x = pontos_brancos[1]
     lista_y = pontos_brancos[0]
     
-    print(lista_x)
+    #print(lista_x)
 
     #linear_regressor = LinearRegression()  # create object for the class
 
@@ -265,7 +266,7 @@ def processa_imagem(imagem): # CHECK
                 
             except:
                 cv2.imshow("regressão", frame)
-                print("passou")
+                #print("passou")
 
         #index_ponto_base_y = Y_pred.index([frame.shape[1]])
         #ponto_base_x = X[index_ponto_base_y]
@@ -388,10 +389,10 @@ def encontra_creepers(imagem_in):
 
         ### MAIOR CONTORNO
         maior = None
-        maior_area_amarela = 0
+        maior_area = 0
         for c in contornos:
             area = cv2.contourArea(c)
-            if area > maior_area_amarela:
+            if area > maior_area:
                 maior_area = area
                 maior = c
 
@@ -451,12 +452,12 @@ def encontra_creepers(imagem_in):
 colidiu = False
 
 def scaneou(dado):
-	print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
-	print("Leituras:")
+	#print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
+	#print("Leituras:")
 	global colidiu
 	leitura = np.array(dado.ranges).round(decimals=2)
 
-	if dado.ranges[0] < 0.18 or dado.ranges[1] < 0.18 or dado.ranges[2] < 0.18 or dado.ranges[3] < 0.18 or dado.ranges[359] < 0.18 or dado.ranges[358] < 0.18 or dado.ranges[357] < 0.18 :
+	if dado.ranges[0] < 0.185 or dado.ranges[1] < 0.185 or dado.ranges[2] < 0.185 or dado.ranges[3] < 0.185 or dado.ranges[359] < 0.185 or dado.ranges[358] < 0.185 or dado.ranges[357] < 0.185 :
 		colidiu  = True
 	else:
 		colidiu = False
@@ -539,16 +540,21 @@ if __name__=="__main__":
     state = ANDANDO_PISTA
 
     def andando_pista():
+        global state
         global cX
         global cY
         centraliza_pista(cX,cY) # percorre pista, centralizando no maior contorno amarelo
         e = colored('ANDANDO PISTA', 'red')
         print(e)
+        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
+            if area > 1100 and objetivo[1]==ids[0]:
+                state = AVANCANDO_CREEPER
         return None
 
     def avancando_creeper():
+        global state
         global pegou_creeper
-        pegou_creeper = False
+        #pegou_creeper = False
         e = colored('AVANCANDO CREEPER', 'red')
         print(e)
         global centro_x_creeper
@@ -561,29 +567,28 @@ if __name__=="__main__":
             print(colored("PAREI", "red"))
             garra.publish(-1.0)  ## abre
             ombro.publish(-0.5) ## para frente
-            rospy.sleep(1.0)
+            rospy.sleep(0.2)
 
             garra.publish(0.0) ## fecha
             rospy.sleep(1.0)
             ombro.publish(1.5) ## para cima
             
-            rospy.sleep(3.0)
+            #rospy.sleep(0.5)
 
-            pegou_creeper = True
-
-            #ombro.publish(0.0) ## para frente
+            state = VOLTANDO_PISTA            #ombro.publish(0.0) ## para frente
 
         return None
 
     def voltando_pista():
         #global maior_area_amarela
+        global state
         global voltei_pista
         voltei_pista = False
         volta = Twist(Vector3(-0.1,0,0), Vector3(0,0,0))
         velocidade_saida.publish(volta)
-        print(maior_area_amarela)
+        print(colored(maior_area_amarela, "red")) # sempre devolve 0
         if maior_area_amarela > 500:
-            voltei_pista = True
+            state = ANDANDO_PISTA
         e = colored('VOLTANDO PISTA', 'red')
         print(e)
         return None
@@ -594,19 +599,19 @@ if __name__=="__main__":
     def soltando_creeper():
         return None
 
-    def dispatch():
-        global state
-        global area
-        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
-            if area > 1100 and objetivo[1]==ids[0]:
-                state = AVANCANDO_CREEPER
-        elif pegou_creeper:
-            state = VOLTANDO_PISTA
-            if voltei_pista:
-                state=ANDANDO_PISTA
-        
-                
-        return None
+#    def dispatch():
+#        global state
+#        print(colored(area, "red"))
+#        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
+#            if area > 1100 and objetivo[1]==ids[0]:
+#                state = AVANCANDO_CREEPER
+#        elif pegou_creeper:
+#            state = VOLTANDO_PISTA
+#            if voltei_pista:
+#                state=ANDANDO_PISTA
+#        
+#                
+#        return None
 
 
 
@@ -625,7 +630,6 @@ if __name__=="__main__":
         while not rospy.is_shutdown():
             for r in resultados:
                 print(r)
-            dispatch()
             #percorrendo_pista(theta, ponto_medio)
             #velocidade_saida.publish(vel)
             acoes[state]()
