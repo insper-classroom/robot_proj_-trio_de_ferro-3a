@@ -31,11 +31,11 @@ from sklearn.linear_model import LinearRegression
 ############ OBJETIVO #############
 
 #objetivo = ('blue',12, 'dog')
-#objetivo = ('orage', 11, 'cow')
-objetivo = ("green", 23, "horse")
+#objetivo = ("green", 23, "horse")
+#objetivo = ('orange', 11, 'cow')
 
 # PARA PERCORRER A PISTA TODA:
-#objetivo = ("percorre", 1, "pista")
+objetivo = ("percorre", 1, "pista")
 
 ###################################
 
@@ -62,7 +62,7 @@ x_bifurcacao1 = 10 #obtido pela odometria
 y_bifurcacao1 = 10 #obtido pela odometria
 x_bifurcacao2 = 10 #obtido pela odometria
 y_bifurcacao2 = 10 #obtido pela odometria
-ids = None
+ids = 0
 pegou_creeper = False
 voltei_pista = False
 maior_area_amarela=0
@@ -121,7 +121,8 @@ def crosshair(img, point, size, color):
 def processa_imagem(imagem): # CHECK
     '''
     Recebe a imagem que o robo ve, realiza todos os processamentos necessários (detecção dos arucos, 
-    masks das faixas amarelas com o calculo do centro de massa, calculo da regressão...) e devolve os centros de massa da maior faixa amarela
+    masks das faixas amarelas com o calculo do centro de massa, calculo da regressão...) e devolve os 
+    centros de massa da maior faixa amarela
     '''
 
     # Filtrando amarelos:
@@ -283,6 +284,10 @@ def processa_imagem(imagem): # CHECK
     
 
 def centraliza_creeper(x_centro, y_centro):    
+    '''
+    Recebe as cordenadas do centro de massa dos creepers, e faz o robô ir em direção ao creeper
+    ajustando o angulo para ir em linha reta.
+    '''
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
@@ -303,7 +308,11 @@ def centraliza_creeper(x_centro, y_centro):
 
     return None
 
-def centraliza_pista(x_centro, y_centro):        
+def centraliza_pista(x_centro, y_centro):
+    '''
+    Recebe as cordenadas do centro de massa da maior faixa amarela no cho, e faz o robô ir em seguir elas
+    ajustando o angulo para ir em linha reta.
+    '''
 
     # Loop principal: centraliza no centro do maior contorno amarelo
     global largura_tela
@@ -332,6 +341,10 @@ def centraliza_pista(x_centro, y_centro):
     return None
 
 def encontra_creepers(imagem_in):
+    '''
+    Recebe a imagem vista pelo robo, segmenta as cores dos creepers de acordo com o objetivo[0] (cor de creeper desejada)
+    e devolve os centros de massa dos creepers, junto com a area.
+    '''
     global objetivo
     global maior_area_amarela
 
@@ -452,19 +465,26 @@ def encontra_creepers(imagem_in):
 colidiu = False
 
 def scaneou(dado):
+    '''
+    funcao responsavel por calcular a distancia do robo pelo lidar, e dada uma certa distancia, seta a variavel colidiu para
+    True que sera usada para ativar a garrinha do robo
+    '''
 	#print("Faixa valida: ", dado.range_min , " - ", dado.range_max )
 	#print("Leituras:")
-	global colidiu
-	leitura = np.array(dado.ranges).round(decimals=2)
+    global colidiu
+    leitura = np.array(dado.ranges).round(decimals=2)
 
-	if dado.ranges[0] < 0.185 or dado.ranges[1] < 0.185 or dado.ranges[2] < 0.185 or dado.ranges[3] < 0.185 or dado.ranges[359] < 0.185 or dado.ranges[358] < 0.185 or dado.ranges[357] < 0.185 :
-		colidiu  = True
-	else:
-		colidiu = False
+    if dado.ranges[0] < 0.185 or dado.ranges[1] < 0.185 or dado.ranges[2] < 0.185 or dado.ranges[3] < 0.185 or dado.ranges[359] < 0.185 or dado.ranges[358] < 0.185 or dado.ranges[357] < 0.185 :
+        colidiu  = True
+    else:
+        colidiu = False
 
 
-# A função a seguir é chamada sempre que chega um novo frame 
+
 def roda_todo_frame(imagem):
+    '''
+    Funçao é chamada toda vez que chega um novo frame
+    '''
     print("frame")
     global cv_image
     global media
@@ -540,18 +560,30 @@ if __name__=="__main__":
     state = ANDANDO_PISTA
 
     def andando_pista():
+        '''
+        Estado que chama a funçao centraliza_pista, e é responsavel por fazer o robo andar na pista.
+        Tambem baseado na area do creeper, ela muda o estado do robo
+        '''
         global state
         global cX
         global cY
         centraliza_pista(cX,cY) # percorre pista, centralizando no maior contorno amarelo
         e = colored('ANDANDO PISTA', 'red')
         print(e)
-        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
-            if area > 1100 and objetivo[1]==ids[0]:
-                state = AVANCANDO_CREEPER
-        return None
+        try:
+
+            if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
+                if area > 1000 and objetivo[1]==ids[0]:
+                    state = AVANCANDO_CREEPER
+            return None
+        except:
+            return None
 
     def avancando_creeper():
+        '''
+        Estado que chama a funcao centraliza_creeper e tambem controla a garra baseado na distancia que o robo esta do creeper
+        Tambem muda o estado apos o uso da garra
+        '''
         global state
         global pegou_creeper
         #pegou_creeper = False
@@ -580,6 +612,10 @@ if __name__=="__main__":
         return None
 
     def voltando_pista():
+        '''
+        Estado responsavel por fazer o robo voltar para o trecho da pista apos ter pegado o creeper.
+        Tambem quando ve a faixa amarela, muda de estado, voltando ao ANDANDO_PISTA
+        '''
         #global maior_area_amarela
         global state
         global voltei_pista
@@ -598,21 +634,6 @@ if __name__=="__main__":
 
     def soltando_creeper():
         return None
-
-#    def dispatch():
-#        global state
-#        print(colored(area, "red"))
-#        if area!=None and centro_x_creeper!=None and centro_y_creeper!=None:
-#            if area > 1100 and objetivo[1]==ids[0]:
-#                state = AVANCANDO_CREEPER
-#        elif pegou_creeper:
-#            state = VOLTANDO_PISTA
-#            if voltei_pista:
-#                state=ANDANDO_PISTA
-#        
-#                
-#        return None
-
 
 
     acoes = {
